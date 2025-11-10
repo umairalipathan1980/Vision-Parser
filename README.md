@@ -1,269 +1,281 @@
-# PDF Vision Parser
+# Document Parsers Library
 
-A PDF parsing tool that uses OpenAI's vision models to convert PDFs to accurate markdown format. Designed to handle complex layouts including tables, multi-row cells, and multi-page documents.
+A collection of document parsing tools that convert various document formats (PDF, DOCX, TXT) to markdown or structured text. Includes four specialized parsers:
 
-## Features
+1. **Vision Parser** - Uses OpenAI's vision models for accurate PDF parsing
+2. **Docling Parser** - Uses Docling library for multi-format document parsing
+3. **PyMuPDF Parser** - Fast local PDF parsing using PyMuPDF (no API required)
+4. **DOCX Parser** - Fast local Word document parsing using python-docx
 
-- **Vision-based parsing**: Uses Azure OpenAI GPT-4 Vision models for accurate content extraction
-- **Complex layout support**: Handles tables, multi-row cells, hierarchical structures
-- **Multi-page documents**: Context-aware parsing across pages
-- **Smart table merging**: Automatically merges tables that span multiple pages
-- **LLM post-processing**: Removes hallucinated content and fixes broken table rows
-- **High accuracy**: Preserves numbers, dates, formatting, and document structure
+---
 
-## Use Cases
+## Vision Parser
 
-- Purchase orders and invoices
-- Bill of materials
-- Financial documents
-- Technical specifications
-- Any structured document with complex tables
+A vision-based PDF parser using OpenAI GPT-4 Vision models to extract content from complex documents.
 
-## Architecture
+### Key Features
+- Vision-based parsing for complex layouts (tables, multi-row cells, hierarchical structures)
+- Context-aware multi-page document processing
+- Smart table merging across pages
+- LLM post-processing to clean and merge content
+- Supports both Azure OpenAI and standard OpenAI API
 
+### Best For
+Purchase orders, invoices, bill of materials, financial documents, technical specifications
+
+### Requirements
+- Python packages: `openai>=1.58.0`, `pdf2image`, `Pillow`, `python-dotenv`
+- System: Poppler (auto-detected or manual installation)
+- API Key: Azure OpenAI or OpenAI API key in `.env` file
+
+### Installation
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Install Poppler
+# Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases
+# Linux: sudo apt-get install poppler-utils
+# macOS: brew install poppler
+
+# Configure API keys in .env file
+echo "AZURE_API_KEY=your_key" > .env
+# OR
+echo "OPENAI_API_KEY=your_key" > .env
 ```
-PDF → Images (pdf2image) → Vision Model (page-by-page) → Raw Markdown
-                                      ↓
-                         LLM Post-Processing (optional)
-                                      ↓
-                    Clean, Merged Markdown Output
-```
 
-## Requirements
+### Usage
 
-### Python Dependencies
-See `requirements.txt`:
-- `openai>=1.58.0` - Azure OpenAI client
-- `pdf2image>=1.17.0` - PDF to image conversion
-- `Pillow>=10.0.0` - Image processing
-- `python-dotenv>=1.0.0` - Environment variable management
-
-### System Dependencies
-
-**Poppler** (required for pdf2image):
-
-- **Windows**: Download from [poppler-windows releases](https://github.com/oschwartz10612/poppler-windows/releases)
-  - Extract to a local directory (e.g., `C:\Users\YourName\poppler-25.07.0`)
-  - Note the path to the `bin` directory
-
-- **Linux**:
-  ```bash
-  sudo apt-get install poppler-utils
-  ```
-
-- **macOS**:
-  ```bash
-  brew install poppler
-  ```
-
-## Installation
-
-1. **Clone or download this repository**
-
-2. **Install Python dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Install Poppler** (see System Dependencies above)
-
-4. **Configure environment variables**:
-   Create a `.env` file in the project root:
-   ```env
-   # For Azure OpenAI (if USE_AZURE=True)
-   AZURE_API_KEY=your_azure_openai_api_key_here
-
-   # For Standard OpenAI (if USE_AZURE=False)
-   OPENAI_API_KEY=your_openai_api_key_here
-   ```
-
-## Configuration
-
-### Choosing Between Azure and Standard OpenAI
-
-The parser supports both Azure OpenAI and standard OpenAI API. Choose which one to use in `vision_parser.py` (line 326):
-
+**Simple (Convenience Function):**
 ```python
-USE_AZURE = True  # Set to False to use standard OpenAI API
-```
+from parsers.vision_parser import parse_pdf
 
-### API Settings
-
-**For Azure OpenAI** (edit `get_openai_config()` function, lines 23-31):
-```python
-if use_azure:
-    return {
-        'use_azure': True,
-        'api_key': os.getenv("AZURE_API_KEY"),
-        'azure_endpoint': "https://your-resource.openai.azure.com/...",
-        'api_version': "2024-12-01-preview",
-        'model': 'gpt-4.1',  # Your deployment name
-    }
-```
-
-**For Standard OpenAI** (edit `get_openai_config()` function, lines 33-37):
-```python
-else:
-    return {
-        'use_azure': False,
-        'api_key': os.getenv("OPENAI_API_KEY"),
-        'model': 'gpt-4o-2024-11-20',  # Model name
-    }
-```
-
-### Poppler Path
-
-The parser will automatically detect poppler installation in common locations:
-- **Windows**: User home directory, C:/, Program Files
-- **Linux/macOS**: System PATH
-
-You can also specify a custom path if needed:
-```python
-poppler_path=r"C:\Users\YourName\poppler-25.07.0\Library\bin"
-```
-
-## Usage
-
-The `vision_parser` module can be used in three ways:
-
-### Method 1: Simple - Convenience Function (Recommended)
-
-The easiest way to get started:
-
-```python
-from vision_parser import parse_pdf
-
-# Parse a PDF with one function call (poppler path auto-detected)
 markdown = parse_pdf(
     pdf_path="document.pdf",
     use_azure=True,
-    output_path="output.md",
-    print_output=True  # Print to console
+    output_path="output.md"
 )
-
-# Access the parsed markdown
-print(markdown[0])
 ```
 
-**Note:** The `poppler_path` parameter is optional and will be auto-detected. Specify it only if you have a custom installation location.
-
-### Method 2: Advanced - Using the VisionParser Class
-
-For more control over the parsing process. **All options are set during initialization:**
-
+**Advanced (Full Control):**
 ```python
-from vision_parser import VisionParser, get_openai_config
+from parsers.vision_parser import VisionParser, get_openai_config
 
-# Step 1: Get configuration
-config = get_openai_config(use_azure=True)  # or False for OpenAI
-
-# Step 2: (Optional) Custom parsing instructions
-custom_prompt = """
-Extract data focusing on:
-- Tables and numerical data
-- Preserve exact formatting
-Return only markdown.
-"""
-
-# Step 3: Initialize parser with ALL options
+config = get_openai_config(use_azure=True)
 parser = VisionParser(
     openai_config=config,
-    custom_prompt=custom_prompt,              # Optional
-    poppler_path=None,                         # Optional - auto-detected if None
-    use_context=True,                          # Context-aware multi-page parsing
-    dpi=200,                                   # Image resolution
-    clean_output=True                          # Enable LLM post-processing
+    custom_prompt=None,      # Optional custom instructions
+    poppler_path=None,       # Auto-detected
+    use_context=True,        # Context-aware parsing
+    dpi=200,                 # Image quality
+    clean_output=True        # LLM post-processing
 )
-
-# Step 4: Parse PDF - only needs file path!
 markdown_pages = parser.convert_pdf("document.pdf")
-
-# Step 5: Save output
 parser.save_markdown(markdown_pages, "output.md")
 ```
 
-### Method 3: Run the Example
-
-A comprehensive example is provided in `example.py`:
-
+**Run Example:**
 ```bash
-python example.py
+python examples/vision_parser_example.py
 ```
 
-The example demonstrates all available configuration options including custom prompts, DPI settings, context awareness, and LLM post-processing
+---
 
-### Customization Options
+## Docling Parser
 
-All options are configured when creating the `VisionParser` instance:
+A multi-format document parser using the Docling library for PDF, DOCX, and TXT files.
 
-**Disable post-processing** (get raw per-page output):
+### Key Features
+- Multi-format support (PDF, DOCX, TXT)
+- Multiple OCR engines (Tesseract CLI, Tesseract, EasyOCR, RapidOCR)
+- Table structure extraction with cell matching
+- Formula/equation enrichment
+- Automatic CUDA/CPU device detection
+- No API costs (runs locally)
+
+### Best For
+Any document type including PDFs, Word documents, and text files where local processing is preferred
+
+### Requirements
+- Python packages: `docling`, `torch` (optional, for GPU), `psutil`
+- No external API keys required
+- Works offline
+
+### Installation
+```bash
+# Install Docling
+pip install docling
+
+# Optional: Install PyTorch for GPU acceleration
+pip install torch
+
+# For memory management
+pip install psutil
+```
+
+### Usage
+
+**Simple (Convenience Function):**
 ```python
-parser = VisionParser(
-    openai_config=config,
-    clean_output=False  # Disable LLM post-processing
+from parsers.docling_parser import parse_document
+
+result = parse_document(
+    file_path="document.pdf",
+    enable_ocr=True,
+    enable_table_structure=True,
+    ocr_engine="tesseract_cli",  # Options: tesseract_cli, tesseract, easyocr, rapidocr
+    output_path="output.md"
 )
-markdown_pages = parser.convert_pdf("document.pdf")
+print(result['text_content'])
 ```
 
-**Disable context awareness** (parse each page independently):
+**Advanced (Full Control):**
 ```python
-parser = VisionParser(
-    openai_config=config,
-    use_context=False  # Each page parsed independently
+from parsers.docling_parser import DoclingParser
+
+parser = DoclingParser(
+    enable_ocr=True,                  # OCR for scanned docs
+    enable_table_structure=True,      # Table extraction
+    enable_formula_enrichment=True,   # Formula support
+    num_threads=4,                    # Processing threads
+    ocr_engine="tesseract_cli"        # OCR engine selection
 )
+
+result = parser.parse_document(
+    file_path="document.pdf",
+    use_markdown=True  # or False for structured text
+)
+
+# Access parsed content
+text = result['text_content']
+metadata = result['file_name'], result['word_count']
 ```
 
-**Adjust image quality**:
+**Run Example:**
+```bash
+python examples/docling_example.py
+```
+
+---
+
+## PyMuPDF Parser
+
+A fast local PDF parser using PyMuPDF (fitz) library for text extraction without external APIs.
+
+### Key Features
+- Fast local PDF parsing (no API costs)
+- Simple text extraction or structured output with positioning
+- No OCR capabilities (fast but limited for scanned documents)
+- No external dependencies beyond PyMuPDF
+- Works offline
+
+### Best For
+Text-based PDFs where speed is important and no OCR is needed
+
+### Requirements
+- Python package: `PyMuPDF`
+- No API keys required
+- Works offline
+
+### Installation
+```bash
+pip install PyMuPDF
+```
+
+### Usage
+
+**Simple (Convenience Function):**
 ```python
-parser = VisionParser(
-    openai_config=config,
-    dpi=300  # Higher DPI = better quality but slower
+from parsers.pymupdf_parser import parse_pdf
+
+result = parse_pdf(
+    file_path="document.pdf",
+    use_markdown=True,  # Simple text
+    output_path="output.txt"
 )
+print(result['text_content'])
 ```
 
-**Specify custom poppler path** (if auto-detection fails):
+**Advanced (Full Control):**
 ```python
-parser = VisionParser(
-    openai_config=config,
-    poppler_path=r"C:\custom\path\to\poppler\bin"
+from parsers.pymupdf_parser import PyMuPDFParser
+
+parser = PyMuPDFParser()
+
+result = parser.parse_document(
+    file_path="document.pdf",
+    use_markdown=False  # Structured with positioning
 )
+
+text = result['text_content']
+metadata = result['file_name'], result['word_count']
 ```
 
-### Custom Prompts
+**Run Example:**
+```bash
+python examples/pymupdf_example.py
+```
 
-Customize the parsing behavior:
+---
 
+## DOCX Parser
+
+A fast local Word document parser using python-docx library for text extraction without external APIs.
+
+### Key Features
+- Fast local DOCX/DOC parsing (no API costs)
+- Extract text from paragraphs and tables
+- Simple text extraction or structured output with formatting
+- Supports Word 2007+ documents
+- Works offline
+
+### Best For
+Word documents where fast local extraction is sufficient
+
+### Requirements
+- Python package: `python-docx`
+- No API keys required
+- Works offline
+
+### Installation
+```bash
+pip install python-docx
+```
+
+### Usage
+
+**Simple (Convenience Function):**
 ```python
-custom_prompt = """
-Convert this document to markdown with focus on:
-- Extracting all numerical data
-- Preserving table structures
-- Capturing specific fields: order numbers, dates, amounts
-- Maintaining hierarchical relationships
+from parsers.docx_parser import parse_docx
 
-Return ONLY markdown content.
-"""
-
-parser = VisionParser(
-    openai_config=config,
-    custom_prompt=custom_prompt
+result = parse_docx(
+    file_path="document.docx",
+    use_markdown=True,  # Simple text
+    output_path="output.txt"
 )
+print(result['text_content'])
 ```
 
-## How It Works
+**Advanced (Full Control):**
+```python
+from parsers.docx_parser import DocxParser
 
-### 1. PDF to Images
-- Converts each PDF page to a high-resolution image (default 200 DPI)
-- Uses poppler's `pdftoppm` under the hood
+parser = DocxParser()
 
-### 2. Vision Model Processing
-- Sends each image to Azure OpenAI Vision API
-- Provides context from previous page for continuity
-- Extracts content as markdown with custom instructions
+result = parser.parse_document(
+    file_path="document.docx",
+    use_markdown=False  # Structured with formatting info
+)
 
-### 3. LLM Post-Processing (Optional)
-- Removes hallucinated empty rows
-- Merges tables split across pages
-- Fixes broken table rows
-- Ensures consistency and readability
+text = result['text_content']
+metadata = result['file_name'], result['word_count']
+```
+
+**Run Example:**
+```bash
+python examples/docx_example.py
+```
+
+---
+
 

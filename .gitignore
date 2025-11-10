@@ -7,12 +7,24 @@
 openai_agents_example.py
 input/
 output/
+combined_classified_output.md
+extraction_results.json
+extraction_results.csv
+po_bom_extraction_results.json
+po_bom_extraction_results.csv
 
 # PDF files (optional - uncomment if you don't want to track PDFs)
 # *.pdf
 
 # Markdown output files
 *_output.md
+*_docling_output.md
+docling_output.md
+*_structured.txt
+*_pymupdf_output.md
+*_pymupdf_structured.md
+*_docx_output.md
+*_docx_structured.md
 
 # Python
 __pycache__/

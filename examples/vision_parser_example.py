@@ -4,7 +4,12 @@ configuration options set during initialization.
 """
 
 import os
-from vision_parser import VisionParser, get_openai_config
+import sys
+
+# Add parent directory to path to import vision_parser module
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from parsers.vision_parser import VisionParser, get_openai_config
 
 
 def main():
@@ -20,13 +25,13 @@ def main():
         custom_prompt=custom_prompt, # Optional: Custom parsing instructions
         poppler_path=None, # Optional: Path to poppler bin (auto-detected if None)
         use_context=True, # Whether to provide context from previous pages (improves multi-page documents)
-        dpi=200, # Image resolution for PDF conversion (higher = better quality, slower)
+        dpi=300, # Image resolution for PDF conversion (higher = better quality, slower)
         clean_output=True # Enable LLM post-processing to clean and merge tables across pages
     )
     print("✓ Parser initialized")
 
     # Parse PDF 
-    pdf_path = "test1.pdf"  # Change to your PDF file
+    pdf_path = "../input/PO_4512560923.pdf"  # Change to your PDF file
 
     if not os.path.exists(pdf_path):
         print(f"\n✗ Error: PDF file not found: {pdf_path}")

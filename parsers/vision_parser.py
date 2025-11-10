@@ -9,66 +9,37 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 from pdf2image import convert_from_path
 from PIL import Image
+import glob
 
 load_dotenv()
 
 
 def detect_poppler_path() -> Optional[str]:
-    """
-    Automatically detect poppler installation path.
-
-    Returns:
-        Path to poppler bin directory if found, None otherwise
-    """
     system = platform.system()
 
-    # For Linux and macOS, poppler is usually in PATH
-    if system in ["Linux", "Darwin"]:
-        # Check if pdfinfo is in PATH (part of poppler-utils)
-        if shutil.which("pdfinfo"):
-            return None  # No path needed, it's in system PATH
+    # On Linux/macOS, if pdfinfo is on PATH, no need to return a path
+    if system in ["Linux", "Darwin"] and shutil.which("pdfinfo"):
+        return None
 
-    # For Windows, search common installation locations
-    elif system == "Windows":
-        # Get user's home directory
-        home = Path.home()
+    if system == "Windows":
+        candidates = []
+        for root in [
+            str(Path.home()),
+            r"C:\Program Files",
+            "C:\\",  # do NOT use r"C:\"
+        ]:
+            candidates += glob.glob(os.path.join(root, "poppler*", "Library", "bin"))
+            candidates += glob.glob(os.path.join(root, "poppler*", "bin"))
 
-        # Common installation patterns
-        search_patterns = [
-            home / "poppler*" / "Library" / "bin",
-            home / "poppler*" / "bin",
-            Path("C:/") / "poppler*" / "Library" / "bin",
-            Path("C:/") / "poppler*" / "bin",
-            Path("C:/Program Files") / "poppler*" / "Library" / "bin",
-            Path("C:/Program Files") / "poppler*" / "bin",
-        ]
+        for p in candidates:
+            pdfinfo = Path(p) / "pdfinfo.exe"
+            if pdfinfo.exists():
+                return p
 
-        # Search for poppler installations
-        for pattern in search_patterns:
-            parent = pattern.parent
-            search_name = pattern.name
-
-            # Handle wildcard in path
-            if "*" in str(pattern):
-                # Get the parent directory and search for matching folders
-                base_pattern = str(pattern.parent).replace("*", "")
-                base_path = Path(base_pattern).parent
-
-                if base_path.exists():
-                    # Find directories matching pattern
-                    for item in base_path.iterdir():
-                        if item.is_dir() and "poppler" in item.name.lower():
-                            # Check both Library/bin and bin
-                            bin_paths = [
-                                item / "Library" / "bin",
-                                item / "bin"
-                            ]
-                            for bin_path in bin_paths:
-                                if bin_path.exists() and (bin_path / "pdfinfo.exe").exists():
-                                    return str(bin_path)
-
-    return None
-
+    raise RuntimeError(
+        "Poppler not found. Install via Chocolatey: `choco install poppler` "
+        "or set `poppler_path` explicitly."
+    )
 
 def get_openai_config(use_azure: bool = True) -> dict:
     """
@@ -93,7 +64,8 @@ def get_openai_config(use_azure: bool = True) -> dict:
         return {
             'use_azure': False,
             'api_key': os.getenv("OPENAI_API_KEY"),
-            'model': 'gpt-4o-2024-11-20',
+            'model': 'gpt-4.1-2025-04-14', #gpt-5-chat-latest    #gpt-4.1-2025-04-14
+
         }
 
 
@@ -116,17 +88,16 @@ Convert this document page to accurate markdown format. Follow these rules STRIC
 - Tables: Use markdown table syntax with | separators
 - Multi-row cells: Keep item descriptions/notes in the same row as the item data
 - Table continuations: If a table continues from a previous page, continue it without repeating headers
+- Images: Interpret images, charts, graphs at at their proper places
 - Preserve ALL visible text: headers, data, footers, page numbers, everything
 - Keep numbers, dates, and text exactly as shown
 - Maintain document structure and layout
+- Keep the items at the same location as they are in the original document
 
 **What to include:**
 - All table data
-- All text paragraphs
-- Company information, addresses
-- Terms and conditions
-- Page numbers, dates
-- Total amounts and summaries
+- All section headings, text paragraphs
+- Interpretation of all images (if any) 
 
 Return ONLY the markdown content, no explanations.
 """
@@ -278,9 +249,9 @@ Return ONLY the markdown content, no explanations.
 {self.custom_prompt}
 
 CONTEXT FROM PREVIOUS PAGE:
-The previous page ended with the following content (last 500 characters):
+The previous page has the following content:
 ```
-{previous_context[-500:]}
+{previous_context}
 ```
 
 If this page continues a table or section from the previous page, continue it seamlessly without repeating headers.

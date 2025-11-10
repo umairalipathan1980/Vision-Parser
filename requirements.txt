@@ -1,8 +1,21 @@
-# Core dependencies
-openai>=1.58.0
-pdf2image>=1.17.0
-Pillow>=10.0.0
-python-dotenv>=1.0.0
+# Vision Parser Dependencies
+openai>=1.58.0          # Azure OpenAI / OpenAI API client
+pdf2image>=1.17.0       # PDF to image conversion
+Pillow>=10.0.0          # Image processing
+python-dotenv>=1.0.0    # Environment variable management
+
+# Docling Parser Dependencies
+docling                 # Docling document parser
+psutil                  # Memory management
+
+# PyMuPDF Parser Dependencies
+PyMuPDF                 # Fast PDF parsing (fitz)
+
+# DOCX Parser Dependencies
+python-docx             # Word document parsing
+
+# Optional: GPU acceleration for Docling Parser
+# torch                 # PyTorch for CUDA support
 
 # Optional: For OpenAI Agents SDK (experimental)
 # agents>=0.1.0
