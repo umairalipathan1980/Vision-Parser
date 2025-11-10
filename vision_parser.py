@@ -43,9 +43,45 @@ class VisionParser:
     (Azure or standard) to extract content in markdown format.
     """
 
-    def __init__(self, openai_config: dict, custom_prompt: str = None, poppler_path: str = None, use_context: bool = True):
+    # Default prompt optimized for table preservation
+    DEFAULT_TABLE_PROMPT = """
+Convert this document page to accurate markdown format. Follow these rules STRICTLY:
+
+**CRITICAL RULES:**
+1. **NO HALLUCINATION**: Only output content that is actually visible on the page
+2. **NO EMPTY ROWS**: Do NOT create empty table rows. If you see a table, only include rows with actual data
+3. **STOP when content ends**: When you reach the end of visible content, STOP. Do not continue with empty rows
+
+**Formatting Requirements:**
+- Tables: Use markdown table syntax with | separators
+- Multi-row cells: Keep item descriptions/notes in the same row as the item data
+- Table continuations: If a table continues from a previous page, continue it without repeating headers
+- Preserve ALL visible text: headers, data, footers, page numbers, everything
+- Keep numbers, dates, and text exactly as shown
+- Maintain document structure and layout
+
+**What to include:**
+- All table data
+- All text paragraphs
+- Company information, addresses
+- Terms and conditions
+- Page numbers, dates
+- Total amounts and summaries
+
+Return ONLY the markdown content, no explanations.
+"""
+
+    def __init__(
+        self,
+        openai_config: dict,
+        custom_prompt: str = None,
+        poppler_path: str = None,
+        use_context: bool = True,
+        dpi: int = 200,
+        clean_output: bool = True
+    ):
         # """
-        # Initialize the VisionParser with OpenAI configuration.
+        # Initialize the VisionParser with all configuration options.
 
         # Args:
         #     openai_config: Dictionary containing OpenAI configuration
@@ -59,14 +95,18 @@ class VisionParser:
         #             - use_azure: False
         #             - api_key: OpenAI API key
         #             - model: Model name (e.g., 'gpt-4o-2024-11-20')
-        #     custom_prompt: Optional custom instructions for the vision model
+        #     custom_prompt: Optional custom instructions for the vision model (uses DEFAULT_TABLE_PROMPT if None)
         #     poppler_path: Path to poppler bin directory (e.g., r"C:\Users\h02317\poppler-25.07.0\Library\bin")
         #     use_context: Whether to provide previous page context for multi-page documents (default: True)
+        #     dpi: Image resolution for PDF conversion (default: 200)
+        #     clean_output: Enable LLM post-processing to clean and merge tables (default: True)
         # """
         self.config = openai_config
         self.custom_prompt = custom_prompt or self._get_default_prompt()
         self.poppler_path = poppler_path
         self.use_context = use_context
+        self.dpi = dpi
+        self.clean_output = clean_output
         self.use_azure = openai_config.get('use_azure', True)
 
         # Initialize appropriate OpenAI client
@@ -264,20 +304,18 @@ OUTPUT: Return ONLY the cleaned, merged markdown. No explanations, no code block
 
         return cleaned_markdown.strip()
 
-    def convert_pdf(self, pdf_path: str, dpi: int = 200, clean_output: bool = True) -> List[str]:
+    def convert_pdf(self, pdf_path: str) -> List[str]:
         """
         Convert PDF to markdown using vision API.
 
         Args:
             pdf_path: Path to the PDF file
-            dpi: Resolution for image conversion (default: 200)
-            clean_output: Whether to use LLM post-processing to clean and merge tables (default: True)
 
         Returns:
             List of markdown strings, one per page (or single cleaned string if clean_output=True)
         """
-        # Convert PDF to images
-        images = self._pdf_to_images(pdf_path, dpi)
+        # Convert PDF to images using configured DPI
+        images = self._pdf_to_images(pdf_path, self.dpi)
 
         # Parse each image with context from previous page
         markdown_pages = []
@@ -290,7 +328,7 @@ OUTPUT: Return ONLY the cleaned, merged markdown. No explanations, no code block
             markdown_pages.append(markdown)
 
         # Post-process with LLM to clean up and merge if requested
-        if clean_output and len(markdown_pages) > 1:
+        if self.clean_output and len(markdown_pages) > 1:
             cleaned = self._clean_markdown_with_llm(markdown_pages)
             return [cleaned]  # Return as single-item list for consistency
 
@@ -320,71 +358,62 @@ OUTPUT: Return ONLY the cleaned, merged markdown. No explanations, no code block
         print(f"Markdown saved to: {output_path}")
 
 
-# Example usage
-if __name__ == "__main__":
-    # Configure which API to use
-    USE_AZURE = True  # Set to False to use standard OpenAI API instead
+def parse_pdf(
+    pdf_path: str,
+    use_azure: bool = True,
+    custom_prompt: str = None,
+    poppler_path: str = None,
+    clean_output: bool = True,
+    dpi: int = 200,
+    use_context: bool = True,
+    output_path: str = None,
+    print_output: bool = False
+) -> List[str]:
+    """
+    Convenience function to parse a PDF with minimal setup.
 
-    # Get configuration based on API choice
-    openai_config = get_openai_config(use_azure=USE_AZURE)
+    Args:
+        pdf_path: Path to the PDF file
+        use_azure: Whether to use Azure OpenAI (True) or standard OpenAI (False)
+        custom_prompt: Custom parsing instructions (uses VisionParser.DEFAULT_TABLE_PROMPT if None)
+        poppler_path: Path to poppler bin directory (required on Windows)
+        clean_output: Enable LLM post-processing to clean and merge tables
+        dpi: Image resolution for PDF conversion
+        use_context: Whether to provide previous page context
+        output_path: Where to save the markdown file (optional)
+        print_output: Whether to print the parsed markdown to console
 
-    # Custom prompt for table preservation
-    custom_prompt = """
-Convert this document page to accurate markdown format. Follow these rules STRICTLY:
+    Returns:
+        List of markdown strings (single item if clean_output=True)
 
-**CRITICAL RULES:**
-1. **NO HALLUCINATION**: Only output content that is actually visible on the page
-2. **NO EMPTY ROWS**: Do NOT create empty table rows. If you see a table, only include rows with actual data
-3. **STOP when content ends**: When you reach the end of visible content, STOP. Do not continue with empty rows
+    Example:
+        >>> from vision_parser import parse_pdf
+        >>> markdown = parse_pdf("document.pdf", use_azure=True)
+        >>> print(markdown[0])
+    """
+    # Get configuration
+    config = get_openai_config(use_azure=use_azure)
 
-**Formatting Requirements:**
-- Tables: Use markdown table syntax with | separators
-- Multi-row cells: Keep item descriptions/notes in the same row as the item data
-- Table continuations: If a table continues from a previous page, continue it without repeating headers
-- Preserve ALL visible text: headers, data, footers, page numbers, everything
-- Keep numbers, dates, and text exactly as shown
-- Maintain document structure and layout
-
-**What to include:**
-- All table data
-- All text paragraphs
-- Company information, addresses
-- Terms and conditions
-- Page numbers, dates
-- Total amounts and summaries
-
-Return ONLY the markdown content, no explanations.
-"""
-
-    # Initialize parser
+    # Initialize parser with all options
     parser = VisionParser(
-        openai_config=openai_config,
-        custom_prompt=custom_prompt,
-        poppler_path=r"C:\Users\h02317\poppler-25.07.0\Library\bin"  # Update if your poppler is in a different location
+        openai_config=config,
+        custom_prompt=custom_prompt or VisionParser.DEFAULT_TABLE_PROMPT,
+        poppler_path=poppler_path,
+        use_context=use_context,
+        dpi=dpi,
+        clean_output=clean_output
     )
 
-    # PDF path (update this to your PDF location)
-    pdf_path = r"3AFP201773305A-BOM.pdf"
+    # Convert PDF to markdown
+    markdown_pages = parser.convert_pdf(pdf_path)
 
-    # Check if file exists
-    if not os.path.exists(pdf_path):
-        print(f"Error: PDF file not found at {pdf_path}")
-        print("Please update the pdf_path variable with the correct path to your PDF file.")
-    else:
-        # Convert PDF to markdown
-        # clean_output=True (default) enables LLM post-processing to:
-        # - Remove hallucinated empty rows
-        # - Merge tables that span multiple pages
-        # - Fix broken table rows
-        # Set clean_output=False to get raw per-page output
-        markdown_pages = parser.convert_pdf(pdf_path, clean_output=True)
-
-        # Print complete markdown output
+    # Print if requested
+    if print_output:
         if len(markdown_pages) == 1:
             print(f"\n{'='*80}")
             print(f"CLEANED AND MERGED OUTPUT")
             print(f"{'='*80}\n")
-            print(markdown_pages[0])  # Print complete markdown
+            print(markdown_pages[0])
             print(f"\n{'='*80}")
             print(f"END OF OUTPUT")
             print(f"{'='*80}\n")
@@ -398,13 +427,11 @@ Return ONLY the markdown content, no explanations.
                 print(f"END OF PAGE {i}")
                 print(f"{'='*80}\n")
 
-        # Save to markdown file in project directory
-        pdf_filename = os.path.basename(pdf_path)
-        output_filename = pdf_filename.replace('.pdf', '_output.md')
-        output_path = os.path.join(os.path.dirname(__file__), output_filename)
+    # Save if output path provided
+    if output_path:
         parser.save_markdown(markdown_pages, output_path)
 
-
+    return markdown_pages
 
 
 

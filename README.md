@@ -125,70 +125,102 @@ pdf_path = r"your_document.pdf"
 
 ## Usage
 
-### Basic Usage
+The `vision_parser` module can be used in three ways:
+
+### Method 1: Simple - Convenience Function (Recommended)
+
+The easiest way to get started:
+
+```python
+from vision_parser import parse_pdf
+
+# Parse a PDF with one function call
+markdown = parse_pdf(
+    pdf_path="document.pdf",
+    use_azure=True,
+    poppler_path=r"C:\path\to\poppler\bin",
+    output_path="output.md",
+    print_output=True  # Print to console
+)
+
+# Access the parsed markdown
+print(markdown[0])
+```
+
+### Method 2: Advanced - Using the VisionParser Class
+
+For more control over the parsing process. **All options are set during initialization:**
 
 ```python
 from vision_parser import VisionParser, get_openai_config
 
-# Choose API (Azure or Standard OpenAI)
-openai_config = get_openai_config(use_azure=True)  # or False for standard OpenAI
+# Step 1: Get configuration
+config = get_openai_config(use_azure=True)  # or False for OpenAI
 
-# Initialize parser
+# Step 2: (Optional) Custom parsing instructions
+custom_prompt = """
+Extract data focusing on:
+- Tables and numerical data
+- Preserve exact formatting
+Return only markdown.
+"""
+
+# Step 3: Initialize parser with ALL options
 parser = VisionParser(
-    openai_config=openai_config,
-    custom_prompt=custom_prompt,  # Optional
-    poppler_path=r"C:\path\to\poppler\bin",
-    use_context=True  # Enable context-aware parsing
+    openai_config=config,
+    custom_prompt=custom_prompt,              # Optional
+    poppler_path=r"C:\path\to\poppler\bin",   # Required on Windows
+    use_context=True,                          # Context-aware multi-page parsing
+    dpi=200,                                   # Image resolution
+    clean_output=True                          # Enable LLM post-processing
 )
 
-# Convert PDF to markdown
-markdown_pages = parser.convert_pdf(
-    pdf_path="document.pdf",
-    dpi=200,  # Image resolution
-    clean_output=True  # Enable LLM post-processing
-)
+# Step 4: Parse PDF - only needs file path!
+markdown_pages = parser.convert_pdf("document.pdf")
 
-# Save to file
-output_path = "output.md"
-parser.save_markdown(markdown_pages, output_path)
+# Step 5: Save output
+parser.save_markdown(markdown_pages, "output.md")
 ```
 
-### Command Line
+### Method 3: Run the Example
 
-Simply run:
+A comprehensive example is provided in `example.py`:
+
 ```bash
-python vision_parser.py
+python example.py
 ```
 
-The script will:
-1. Convert the PDF specified in the code
-2. Parse each page with vision model
-3. Apply LLM post-processing to clean and merge
-4. Save the output as `{filename}_output.md`
+The example demonstrates all available configuration options including custom prompts, DPI settings, context awareness, and LLM post-processing
 
-### Advanced Options
+### Customization Options
+
+All options are configured when creating the `VisionParser` instance:
 
 **Disable post-processing** (get raw per-page output):
 ```python
-markdown_pages = parser.convert_pdf(
-    pdf_path="document.pdf",
-    clean_output=False
+parser = VisionParser(
+    openai_config=config,
+    poppler_path=r"C:\path\to\poppler\bin",
+    clean_output=False  # Disable LLM post-processing
 )
+markdown_pages = parser.convert_pdf("document.pdf")
 ```
 
 **Disable context awareness** (parse each page independently):
 ```python
 parser = VisionParser(
-    openai_config=openai_config,
-    use_context=False
+    openai_config=config,
+    poppler_path=r"C:\path\to\poppler\bin",
+    use_context=False  # Each page parsed independently
 )
 ```
 
 **Adjust image quality**:
 ```python
-markdown_pages = parser.convert_pdf(
-    pdf_path="document.pdf",
-    dpi=300  # Higher DPI = better quality but larger images
+parser = VisionParser(
+    openai_config=config,
+    poppler_path=r"C:\path\to\poppler\bin",
+    dpi=300  # Higher DPI = better quality but slower
 )
 ```
 
@@ -208,8 +240,9 @@ Return ONLY markdown content.
 """
 
 parser = VisionParser(
-    openai_config=openai_config,
-    custom_prompt=custom_prompt
+    openai_config=config,
+    custom_prompt=custom_prompt,
+    poppler_path=r"C:\path\to\poppler\bin"
 )
 ```
 
