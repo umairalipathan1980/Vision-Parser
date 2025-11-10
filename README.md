@@ -111,16 +111,15 @@ else:
     }
 ```
 
-### Other Settings
+### Poppler Path
 
-**Poppler path** (line 363):
+The parser will automatically detect poppler installation in common locations:
+- **Windows**: User home directory, C:/, Program Files
+- **Linux/macOS**: System PATH
+
+You can also specify a custom path if needed:
 ```python
 poppler_path=r"C:\Users\YourName\poppler-25.07.0\Library\bin"
-```
-
-**PDF path** (line 367):
-```python
-pdf_path = r"your_document.pdf"
 ```
 
 ## Usage
@@ -134,11 +133,10 @@ The easiest way to get started:
 ```python
 from vision_parser import parse_pdf
 
-# Parse a PDF with one function call
+# Parse a PDF with one function call (poppler path auto-detected)
 markdown = parse_pdf(
     pdf_path="document.pdf",
     use_azure=True,
-    poppler_path=r"C:\path\to\poppler\bin",
     output_path="output.md",
     print_output=True  # Print to console
 )
@@ -146,6 +144,8 @@ markdown = parse_pdf(
 # Access the parsed markdown
 print(markdown[0])
 ```
+
+**Note:** The `poppler_path` parameter is optional and will be auto-detected. Specify it only if you have a custom installation location.
 
 ### Method 2: Advanced - Using the VisionParser Class
 
@@ -169,7 +169,7 @@ Return only markdown.
 parser = VisionParser(
     openai_config=config,
     custom_prompt=custom_prompt,              # Optional
-    poppler_path=r"C:\path\to\poppler\bin",   # Required on Windows
+    poppler_path=None,                         # Optional - auto-detected if None
     use_context=True,                          # Context-aware multi-page parsing
     dpi=200,                                   # Image resolution
     clean_output=True                          # Enable LLM post-processing
@@ -200,7 +200,6 @@ All options are configured when creating the `VisionParser` instance:
 ```python
 parser = VisionParser(
     openai_config=config,
-    poppler_path=r"C:\path\to\poppler\bin",
     clean_output=False  # Disable LLM post-processing
 )
 markdown_pages = parser.convert_pdf("document.pdf")
@@ -210,7 +209,6 @@ markdown_pages = parser.convert_pdf("document.pdf")
 ```python
 parser = VisionParser(
     openai_config=config,
-    poppler_path=r"C:\path\to\poppler\bin",
     use_context=False  # Each page parsed independently
 )
 ```
@@ -219,8 +217,15 @@ parser = VisionParser(
 ```python
 parser = VisionParser(
     openai_config=config,
-    poppler_path=r"C:\path\to\poppler\bin",
     dpi=300  # Higher DPI = better quality but slower
+)
+```
+
+**Specify custom poppler path** (if auto-detection fails):
+```python
+parser = VisionParser(
+    openai_config=config,
+    poppler_path=r"C:\custom\path\to\poppler\bin"
 )
 ```
 
@@ -241,8 +246,7 @@ Return ONLY markdown content.
 
 parser = VisionParser(
     openai_config=config,
-    custom_prompt=custom_prompt,
-    poppler_path=r"C:\path\to\poppler\bin"
+    custom_prompt=custom_prompt
 )
 ```
 

@@ -1,13 +1,73 @@
 import os
 import base64
+import platform
+import shutil
+from pathlib import Path
 from io import BytesIO
-from typing import List
+from typing import List, Optional
 from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 from pdf2image import convert_from_path
 from PIL import Image
 
 load_dotenv()
+
+
+def detect_poppler_path() -> Optional[str]:
+    """
+    Automatically detect poppler installation path.
+
+    Returns:
+        Path to poppler bin directory if found, None otherwise
+    """
+    system = platform.system()
+
+    # For Linux and macOS, poppler is usually in PATH
+    if system in ["Linux", "Darwin"]:
+        # Check if pdfinfo is in PATH (part of poppler-utils)
+        if shutil.which("pdfinfo"):
+            return None  # No path needed, it's in system PATH
+
+    # For Windows, search common installation locations
+    elif system == "Windows":
+        # Get user's home directory
+        home = Path.home()
+
+        # Common installation patterns
+        search_patterns = [
+            home / "poppler*" / "Library" / "bin",
+            home / "poppler*" / "bin",
+            Path("C:/") / "poppler*" / "Library" / "bin",
+            Path("C:/") / "poppler*" / "bin",
+            Path("C:/Program Files") / "poppler*" / "Library" / "bin",
+            Path("C:/Program Files") / "poppler*" / "bin",
+        ]
+
+        # Search for poppler installations
+        for pattern in search_patterns:
+            parent = pattern.parent
+            search_name = pattern.name
+
+            # Handle wildcard in path
+            if "*" in str(pattern):
+                # Get the parent directory and search for matching folders
+                base_pattern = str(pattern.parent).replace("*", "")
+                base_path = Path(base_pattern).parent
+
+                if base_path.exists():
+                    # Find directories matching pattern
+                    for item in base_path.iterdir():
+                        if item.is_dir() and "poppler" in item.name.lower():
+                            # Check both Library/bin and bin
+                            bin_paths = [
+                                item / "Library" / "bin",
+                                item / "bin"
+                            ]
+                            for bin_path in bin_paths:
+                                if bin_path.exists() and (bin_path / "pdfinfo.exe").exists():
+                                    return str(bin_path)
+
+    return None
 
 
 def get_openai_config(use_azure: bool = True) -> dict:
@@ -96,14 +156,24 @@ Return ONLY the markdown content, no explanations.
         #             - api_key: OpenAI API key
         #             - model: Model name (e.g., 'gpt-4o-2024-11-20')
         #     custom_prompt: Optional custom instructions for the vision model (uses DEFAULT_TABLE_PROMPT if None)
-        #     poppler_path: Path to poppler bin directory (e.g., r"C:\Users\h02317\poppler-25.07.0\Library\bin")
+        #     poppler_path: Optional path to poppler bin directory. If None, will attempt auto-detection.
+        #                   (e.g., r"C:\Users\h02317\poppler-25.07.0\Library\bin")
         #     use_context: Whether to provide previous page context for multi-page documents (default: True)
         #     dpi: Image resolution for PDF conversion (default: 200)
         #     clean_output: Enable LLM post-processing to clean and merge tables (default: True)
         # """
         self.config = openai_config
         self.custom_prompt = custom_prompt or self._get_default_prompt()
-        self.poppler_path = poppler_path
+
+        # Auto-detect poppler path if not provided
+        if poppler_path is None:
+            detected_path = detect_poppler_path()
+            self.poppler_path = detected_path
+            if detected_path:
+                print(f"Auto-detected poppler at: {detected_path}")
+        else:
+            self.poppler_path = poppler_path
+
         self.use_context = use_context
         self.dpi = dpi
         self.clean_output = clean_output
@@ -376,7 +446,7 @@ def parse_pdf(
         pdf_path: Path to the PDF file
         use_azure: Whether to use Azure OpenAI (True) or standard OpenAI (False)
         custom_prompt: Custom parsing instructions (uses VisionParser.DEFAULT_TABLE_PROMPT if None)
-        poppler_path: Path to poppler bin directory (required on Windows)
+        poppler_path: Optional path to poppler bin directory (auto-detected if None)
         clean_output: Enable LLM post-processing to clean and merge tables
         dpi: Image resolution for PDF conversion
         use_context: Whether to provide previous page context

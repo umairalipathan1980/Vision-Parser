@@ -13,17 +13,17 @@ def main():
     config = get_openai_config(use_azure=True)
     custom_prompt = "" #Optional
 
-    # Create VisionParser 
+    # Create VisionParser
     print("\nCreating VisionParser...")
     parser = VisionParser(
         openai_config=config, # Required: OpenAI configuration
-        custom_prompt=custom_prompt, # Optional: Custom parsing instructions 
-        poppler_path=r"C:\Users\h02317\poppler-25.07.0\Library\bin", # Required on Windows: Path to poppler bin directory
+        custom_prompt=custom_prompt, # Optional: Custom parsing instructions
+        poppler_path=None, # Optional: Path to poppler bin (auto-detected if None)
         use_context=True, # Whether to provide context from previous pages (improves multi-page documents)
         dpi=200, # Image resolution for PDF conversion (higher = better quality, slower)
         clean_output=True # Enable LLM post-processing to clean and merge tables across pages
     )
-    print("✓ Parser initialized:")
+    print("✓ Parser initialized")
 
     # Parse PDF 
     pdf_path = "test1.pdf"  # Change to your PDF file
