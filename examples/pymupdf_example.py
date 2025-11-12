@@ -24,7 +24,7 @@ def main():
     print(f"  - Supported formats: {', '.join(parser.supported_extensions)}")
 
     # Step 2: Parse PDF file
-    pdf_path = "../PO_4512560923.pdf"  # Input PDF file
+    pdf_path = "../input/PO_4512560923.pdf"  # Input PDF file
 
     if not os.path.exists(pdf_path):
         print(f"\n✗ Error: PDF file not found: {pdf_path}")

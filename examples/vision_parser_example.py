@@ -23,9 +23,8 @@ def main():
     parser = VisionParser(
         openai_config=config, # Required: OpenAI configuration
         custom_prompt=custom_prompt, # Optional: Custom parsing instructions
-        poppler_path=None, # Optional: Path to poppler bin (auto-detected if None)
         use_context=True, # Whether to provide context from previous pages (improves multi-page documents)
-        dpi=300, # Image resolution for PDF conversion (higher = better quality, slower)
+        dpi=150, # Image resolution for PDF conversion (higher = better quality, slower)
         clean_output=True # Enable LLM post-processing to clean and merge tables across pages
     )
     print("✓ Parser initialized")
